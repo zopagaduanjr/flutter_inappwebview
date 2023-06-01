@@ -596,116 +596,56 @@ public class InAppWebViewChromeClient extends WebChromeClient implements PluginR
     windowAutoincrementId++;
     final int windowId = windowAutoincrementId;
 
-    WebView.HitTestResult result = view.getHitTestResult();
-    String url = result.getExtra();
-
-    // Ensure that images with hyperlink return the correct URL, not the image source
-    if(result.getType() == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE) {
-      Message href = view.getHandler().obtainMessage();
-      view.requestFocusNodeHref(href);
-      Bundle data = href.getData();
-      if (data != null) {
-        String imageUrl = data.getString("url");
-        if(imageUrl != null && !imageUrl.isEmpty()) {
-          url = imageUrl;
-        }
-      }
-    }
-
-    if(result.getType() == WebView.HitTestResult.UNKNOWN_TYPE) {
-      WebView targetWebView = new WebView(getActivity());
-      targetWebView.setWebViewClient(new WebViewClient(){
-        @Override
-        public boolean shouldOverrideUrlLoading (WebView view, String url) {
-          URLRequest request = new URLRequest(url, "GET", null, null);
-          CreateWindowAction createWindowAction = new CreateWindowAction(
-                  request,
-                  true,
-                  isUserGesture,
-                  false,
-                  windowId,
-                  isDialog
-          );
-
-          windowWebViewMessages.put(windowId, resultMsg);
-
-          channel.invokeMethod("onCreateWindow", createWindowAction.toMap(), new MethodChannel.Result() {
-            @Override
-            public void success(@Nullable Object result) {
-              boolean handledByClient = false;
-              if (result instanceof Boolean) {
-                handledByClient = (boolean) result;
-              }
-              if (!handledByClient && InAppWebViewChromeClient.windowWebViewMessages.containsKey(windowId)) {
-                InAppWebViewChromeClient.windowWebViewMessages.remove(windowId);
-              }
-            }
-
-            @Override
-            public void error(String errorCode, @Nullable String errorMessage, @Nullable Object errorDetails) {
-              Log.e(LOG_TAG, errorCode + ", " + ((errorMessage != null) ? errorMessage : ""));
-              if (InAppWebViewChromeClient.windowWebViewMessages.containsKey(windowId)) {
-                InAppWebViewChromeClient.windowWebViewMessages.remove(windowId);
-              }
-            }
-
-            @Override
-            public void notImplemented() {
-              if (InAppWebViewChromeClient.windowWebViewMessages.containsKey(windowId)) {
-                InAppWebViewChromeClient.windowWebViewMessages.remove(windowId);
-              }
-            }
-          });
-
-          return true;
-        }
-      });
-      WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
-      transport.setWebView(targetWebView);
-      resultMsg.sendToTarget();
-      return true;
-    }
-
-    URLRequest request = new URLRequest(url, "GET", null, null);
-    CreateWindowAction createWindowAction = new CreateWindowAction(
-            request,
-            true,
-            isUserGesture,
-            false,
-            windowId,
-            isDialog
-    );
-
-    windowWebViewMessages.put(windowId, resultMsg);
-
-    channel.invokeMethod("onCreateWindow", createWindowAction.toMap(), new MethodChannel.Result() {
+    WebView targetWebView = new WebView(getActivity());
+    targetWebView.setWebViewClient(new WebViewClient(){
       @Override
-      public void success(@Nullable Object result) {
-        boolean handledByClient = false;
-        if (result instanceof Boolean) {
-          handledByClient = (boolean) result;
-        }
-        if (!handledByClient && InAppWebViewChromeClient.windowWebViewMessages.containsKey(windowId)) {
-          InAppWebViewChromeClient.windowWebViewMessages.remove(windowId);
-        }
-      }
+      public boolean shouldOverrideUrlLoading (WebView view, String url) {
+        URLRequest request = new URLRequest(url, "GET", null, null);
+        CreateWindowAction createWindowAction = new CreateWindowAction(
+                request,
+                true,
+                isUserGesture,
+                false,
+                windowId,
+                isDialog
+        );
 
-      @Override
-      public void error(String errorCode, @Nullable String errorMessage, @Nullable Object errorDetails) {
-        Log.e(LOG_TAG, errorCode + ", " + ((errorMessage != null) ? errorMessage : ""));
-        if (InAppWebViewChromeClient.windowWebViewMessages.containsKey(windowId)) {
-          InAppWebViewChromeClient.windowWebViewMessages.remove(windowId);
-        }
-      }
+        windowWebViewMessages.put(windowId, resultMsg);
 
-      @Override
-      public void notImplemented() {
-        if (InAppWebViewChromeClient.windowWebViewMessages.containsKey(windowId)) {
-          InAppWebViewChromeClient.windowWebViewMessages.remove(windowId);
-        }
+        channel.invokeMethod("onCreateWindow", createWindowAction.toMap(), new MethodChannel.Result() {
+          @Override
+          public void success(@Nullable Object result) {
+            boolean handledByClient = false;
+            if (result instanceof Boolean) {
+              handledByClient = (boolean) result;
+            }
+            if (!handledByClient && InAppWebViewChromeClient.windowWebViewMessages.containsKey(windowId)) {
+              InAppWebViewChromeClient.windowWebViewMessages.remove(windowId);
+            }
+          }
+
+          @Override
+          public void error(String errorCode, @Nullable String errorMessage, @Nullable Object errorDetails) {
+            Log.e(LOG_TAG, errorCode + ", " + ((errorMessage != null) ? errorMessage : ""));
+            if (InAppWebViewChromeClient.windowWebViewMessages.containsKey(windowId)) {
+              InAppWebViewChromeClient.windowWebViewMessages.remove(windowId);
+            }
+          }
+
+          @Override
+          public void notImplemented() {
+            if (InAppWebViewChromeClient.windowWebViewMessages.containsKey(windowId)) {
+              InAppWebViewChromeClient.windowWebViewMessages.remove(windowId);
+            }
+          }
+        });
+
+        return true;
       }
     });
-
+    WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
+    transport.setWebView(targetWebView);
+    resultMsg.sendToTarget();
     return true;
   }
 
