@@ -30,6 +30,7 @@ import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -591,7 +592,7 @@ public class InAppWebViewChromeClient extends WebChromeClient implements PluginR
   }
 
   @Override
-  public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, final Message resultMsg) {
+  public boolean onCreateWindow(WebView view, final boolean isDialog, final boolean isUserGesture, final Message resultMsg) {
     windowAutoincrementId++;
     final int windowId = windowAutoincrementId;
 
@@ -609,6 +610,60 @@ public class InAppWebViewChromeClient extends WebChromeClient implements PluginR
           url = imageUrl;
         }
       }
+    }
+
+    if(result.getType() == WebView.HitTestResult.UNKNOWN_TYPE) {
+      WebView targetWebView = new WebView(getActivity());
+      targetWebView.setWebViewClient(new WebViewClient(){
+        @Override
+        public boolean shouldOverrideUrlLoading (WebView view, String url) {
+          URLRequest request = new URLRequest(url, "GET", null, null);
+          CreateWindowAction createWindowAction = new CreateWindowAction(
+                  request,
+                  true,
+                  isUserGesture,
+                  false,
+                  windowId,
+                  isDialog
+          );
+
+          windowWebViewMessages.put(windowId, resultMsg);
+
+          channel.invokeMethod("onCreateWindow", createWindowAction.toMap(), new MethodChannel.Result() {
+            @Override
+            public void success(@Nullable Object result) {
+              boolean handledByClient = false;
+              if (result instanceof Boolean) {
+                handledByClient = (boolean) result;
+              }
+              if (!handledByClient && InAppWebViewChromeClient.windowWebViewMessages.containsKey(windowId)) {
+                InAppWebViewChromeClient.windowWebViewMessages.remove(windowId);
+              }
+            }
+
+            @Override
+            public void error(String errorCode, @Nullable String errorMessage, @Nullable Object errorDetails) {
+              Log.e(LOG_TAG, errorCode + ", " + ((errorMessage != null) ? errorMessage : ""));
+              if (InAppWebViewChromeClient.windowWebViewMessages.containsKey(windowId)) {
+                InAppWebViewChromeClient.windowWebViewMessages.remove(windowId);
+              }
+            }
+
+            @Override
+            public void notImplemented() {
+              if (InAppWebViewChromeClient.windowWebViewMessages.containsKey(windowId)) {
+                InAppWebViewChromeClient.windowWebViewMessages.remove(windowId);
+              }
+            }
+          });
+
+          return true;
+        }
+      });
+      WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
+      transport.setWebView(targetWebView);
+      resultMsg.sendToTarget();
+      return true;
     }
 
     URLRequest request = new URLRequest(url, "GET", null, null);
